@@ -1,0 +1,15 @@
+param NumYears := 5;
+
+param MaintCost :=
+0   2000
+1   3500
+2   6000
+3   9500
+4  14000;
+
+param PurchCost :=
+1   10000
+2   13000
+3   16500
+4   20000
+5   25000;
