@@ -31,6 +31,9 @@ with open("2021_ICM_Problem_D_Data/influence_data.csv", newline="", encoding="ut
             pop_influence.add_edge(influencer_id,follower_id)
 
 
+
+#Draws a graph of all pop connections (Very Laggy)
+'''
 pos = nx.spring_layout(pop_influence,seed=42)
 
 plt.figure(figsize=(14,10))
@@ -41,8 +44,30 @@ nx.draw_networkx_nodes(
 nx.draw_networkx_edges(
     pop_influence,pos,arrows=True, arrowstyle="-|>",arrowsize=5,width=0.3,alpha=0.15
 )
+'''
 
-plt.title("Influence: Pop/Rock")
+#Makes graph of the top 30 pop artists
+top_artists = sorted(pop_influence.nodes(), key=lambda artist: pop_influence.out_degree(artist), reverse = True)[:50]
+
+top_pop_influence = pop_influence.subgraph(top_artists).copy()
+
+pos = nx.spring_layout(top_pop_influence,seed=42,k=1.5,iterations=100)
+labels=nx.get_node_attributes(top_pop_influence,"name")
+plt.figure(figsize=(16,12))
+
+node_sizes = [100+2*pop_influence.out_degree(artist) for artist in top_pop_influence.nodes()]
+
+nx.draw_networkx_nodes(
+    top_pop_influence,pos,node_size=node_sizes,node_color="purple"
+)
+nx.draw_networkx_edges(
+    top_pop_influence,pos,arrows=True, arrowstyle="-|>",arrowsize=10,width=0.6,alpha=0.3
+)
+nx.draw_networkx_labels(
+    top_pop_influence,pos,labels=labels,font_size=8
+)
+
+plt.title("Top Influence: Pop/Rock")
 plt.axis("off")
 plt.tight_layout()
 plt.show()
