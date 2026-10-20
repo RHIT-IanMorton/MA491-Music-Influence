@@ -19,6 +19,7 @@ import pandas as pd
 import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
 from itertools import combinations
+import numpy as np
 
 # =========================
 # Configuration
@@ -29,7 +30,7 @@ INFLUENCE_FILE = DATA_FOLDER + "influence_data.csv"
 ARTIST_FILE = DATA_FOLDER + "data_by_artist.csv"
 
 GENRE = "Jazz"
-SIMILARITY_THRESHOLD = 0.75
+SIMILARITY_THRESHOLD = 8
 
 # Choose the columns from data_by_artist.csv that form each vector.
 # Replace these examples with columns that actually exist in your file.
@@ -45,7 +46,7 @@ FEATURE_COLUMNS = [
     "instrumentalness",
     "liveness",
     "speechiness",
-    "duration_ms"
+    "duration_ms",
     ]
 
 OUTPUT_GRAPH = DATA_FOLDER + "artist_similarity.graphml"
@@ -163,7 +164,7 @@ def build_similarity_graph(vectors):
         graph.add_node(artist_id)
 
     # Calculate cosine similarities for all pairs at once.
-    similarities = cosine_similarity(vectors.to_numpy())
+    similarities = -np.log10(1-cosine_similarity(vectors.to_numpy()))
 
     # Add an undirected weighted edge between every pair.
     for i, j in combinations(range(len(artist_ids)), 2):
