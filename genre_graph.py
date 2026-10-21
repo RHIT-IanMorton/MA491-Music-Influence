@@ -6,7 +6,7 @@ Scraps through influence_data.csv to find all unique artist_ids of a given genre
 Creates a feature vector for each artist_id with data from data_by_artist.csv.
 
 Creates a graph with all artists being nodes, and edges between each artist being
-weighted by the cosine similarity between their feature vectors, only including edges
+weighted by the similarity as calculated with score() between their feature vectors, only including edges
 with a weight of at least SIMILARITY_THRESHOLD which ranges higher in 0 to 1.
 
 
@@ -18,6 +18,7 @@ with a weight of at least SIMILARITY_THRESHOLD which ranges higher in 0 to 1.
 import pandas as pd
 import networkx as nx
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import StandardScaler
 from itertools import combinations
 import numpy as np
 
@@ -27,7 +28,7 @@ import numpy as np
 
 DATA_FOLDER = "data/"
 INFLUENCE_FILE = DATA_FOLDER + "influence_data.csv"
-ARTIST_FILE = DATA_FOLDER + "data_by_artist.csv"
+ARTIST_FILE = DATA_FOLDER + "artist_vectors.csv"
 
 GENRE = "Jazz"
 SIMILARITY_THRESHOLD = 8
@@ -50,7 +51,7 @@ FEATURE_COLUMNS = [
     ]
 
 OUTPUT_GRAPH = DATA_FOLDER + "artist_similarity.graphml"
-OUTPUT_FEATURES = DATA_FOLDER + "artist_vectors.csv"
+OUTPUT_FEATURES = DATA_FOLDER + "graph_vectors.csv"
 
 
 # =========================
@@ -79,76 +80,175 @@ def get_genre_ids(influence_file, genre):
     # Normalize IDs so values like 123 and "123" match.
     return set(ids.astype(str).str.strip()) - {""}
 
+def get_all_ids(artist_file):
+    df = pd.read_csv(artist_file)
+    id = df["artist_id"].dropna()
+    return set(id.astype(str).str.strip()) - {""}
+
 
 # =========================
 # 2. Build artist vectors
 # =========================
 
+
+# def get_artist_vectors(artist_file, artist_ids, features):
+#     df = pd.read_csv(artist_file)
+
+#     required_columns = ["artist_id"] + features
+#     missing_columns = set(required_columns) - set(df.columns)
+
+#     if missing_columns:
+#         raise ValueError(
+#             f"Columns not found in {artist_file}: "
+#             f"{sorted(missing_columns)}"
+#         )
+
+#     df["artist_id"] = df["artist_id"].astype("string").str.strip()
+
+#     # Keep only artists in the requested genre.
+#     df = df[df["artist_id"].isin(artist_ids)].copy()
+
+#     # Ensure each artist has only one feature vector.
+#     # Stop if artist_id is not unique rather than choosing a row arbitrarily.
+#     if df["artist_id"].duplicated().any():
+#         duplicates = df.loc[
+#             df["artist_id"].duplicated(keep=False), "artist_id"
+#         ].unique()
+
+#         raise ValueError(
+#             f"Duplicate artist_id values found: {list(duplicates[:10])}. "
+#             "Resolve duplicate rows before building the graph."
+#         )
+
+#     # Use artist IDs as the index.
+#     df = df.set_index("artist_id")
+
+#     # Extract the selected features.
+#     vectors = df[features].copy()
+
+#     # Convert selected features to numeric values.
+#     for column in features:
+#         vectors[column] = pd.to_numeric(
+#             vectors[column], errors="coerce"
+#         )
+
+#     # Replace infinite values with missing values.
+#     vectors = vectors.replace([float("inf"), float("-inf")], float("nan"))
+
+#     # Drop features that contain no usable numeric values.
+#     vectors = vectors.dropna(axis=1, how="all")
+
+#     if vectors.shape[1] == 0:
+#         raise ValueError("No usable numeric feature columns remain.")
+
+#     # Fill missing values with each feature's median.
+#     vectors = vectors.fillna(vectors.median())
+
+#     # Cosine similarity is undefined for zero vectors.
+#     zero_vectors = vectors.eq(0).all(axis=1)
+#     if zero_vectors.any():
+#         zero_ids = vectors.index[zero_vectors].tolist()
+#         print(
+#             f"Warning: excluding {len(zero_ids)} artists "
+#             "whose vectors contain only zeros."
+#         )
+#         vectors = vectors.loc[~zero_vectors]
+
+#     return vectors
+
 def get_artist_vectors(artist_file, artist_ids, features):
-    df = pd.read_csv(artist_file)
+    df = pd.read_csv(artist_file, dtype={"artist_id": str})
 
-    required_columns = ["artist_id"] + features
-    missing_columns = set(required_columns) - set(df.columns)
+    df["artist_id"] = df["artist_id"].str.strip()
+    artist_ids = {str(i).strip() for i in artist_ids}
 
-    if missing_columns:
-        raise ValueError(
-            f"Columns not found in {artist_file}: "
-            f"{sorted(missing_columns)}"
-        )
-
-    df["artist_id"] = df["artist_id"].astype("string").str.strip()
-
-    # Keep only artists in the requested genre.
+    # Keep only requested artists
     df = df[df["artist_id"].isin(artist_ids)].copy()
 
-    # Ensure each artist has only one feature vector.
-    # Stop if artist_id is not unique rather than choosing a row arbitrarily.
     if df["artist_id"].duplicated().any():
-        duplicates = df.loc[
-            df["artist_id"].duplicated(keep=False), "artist_id"
-        ].unique()
+        raise ValueError("Duplicate artist_id values found.")
 
-        raise ValueError(
-            f"Duplicate artist_id values found: {list(duplicates[:10])}. "
-            "Resolve duplicate rows before building the graph."
-        )
+    # Extract numeric features
+    vectors = df.set_index("artist_id")[features].apply(
+        pd.to_numeric, errors="coerce"
+    )
 
-    # Use artist IDs as the index.
-    df = df.set_index("artist_id")
-
-    # Extract the selected features.
-    vectors = df[features].copy()
-
-    # Convert selected features to numeric values.
-    for column in features:
-        vectors[column] = pd.to_numeric(
-            vectors[column], errors="coerce"
-        )
-
-    # Replace infinite values with missing values.
-    vectors = vectors.replace([float("inf"), float("-inf")], float("nan"))
-
-    # Drop features that contain no usable numeric values.
+    vectors = vectors.replace([np.inf, -np.inf], np.nan)
     vectors = vectors.dropna(axis=1, how="all")
-
-    if vectors.shape[1] == 0:
-        raise ValueError("No usable numeric feature columns remain.")
-
-    # Fill missing values with each feature's median.
     vectors = vectors.fillna(vectors.median())
 
-    # Cosine similarity is undefined for zero vectors.
-    zero_vectors = vectors.eq(0).all(axis=1)
-    if zero_vectors.any():
-        zero_ids = vectors.index[zero_vectors].tolist()
-        print(
-            f"Warning: excluding {len(zero_ids)} artists "
-            "whose vectors contain only zeros."
+    # Remove artists with no usable feature values
+    vectors = vectors.dropna(axis=0, how="any")
+
+    # Standardize features across artists (mean=0, std=1)
+    scaler = StandardScaler()
+    standardized = scaler.fit_transform(vectors)
+
+    return pd.DataFrame(
+        standardized,
+        index=vectors.index,
+        columns=vectors.columns
+    )
+
+def get_artist_vector(artist_id):
+    """Return the feature vector for a given artist_id."""
+
+    artist_id = str(artist_id)
+    df = pd.read_csv(ARTIST_FILE, dtype={"artist_id": str})
+
+    # Find the artist's row
+    artist = df.loc[df["artist_id"] == str(artist_id)]
+
+    if artist.empty:
+        raise ValueError(f"Artist ID {artist_id} not found.")
+
+    if len(artist) > 1:
+        raise ValueError(f"Multiple rows found for artist ID {artist_id}.")
+
+    # Extract the selected fields as a numeric vector
+    vector = artist.iloc[0][FEATURE_COLUMNS]
+    vector = pd.to_numeric(vector, errors="raise")
+
+    return vector.to_numpy(dtype=float)
+
+def score(v1, v2, method="gaussian", sigma=1.0):
+    v1 = np.asarray(v1, dtype=float).ravel()
+    v2 = np.asarray(v2, dtype=float).ravel()
+
+
+    if v1.shape != v2.shape:
+        raise ValueError("Vectors must have the same shape.")
+
+    if not np.all(np.isfinite(v1)) or not np.all(np.isfinite(v2)):
+        raise ValueError("Vectors must contain only finite values.")
+
+    distance = np.linalg.norm(v1 - v2)
+
+    if method == "euclidean":
+        return float(distance)
+
+    elif method == "gaussian":
+        if sigma <= 0:
+            raise ValueError("sigma must be positive.")
+        return float(np.exp(-(distance ** 2) / (2 * sigma ** 2)))
+
+    else:
+        raise ValueError(
+            "method must be 'euclidean' or 'gaussian'."
         )
-        vectors = vectors.loc[~zero_vectors]
 
-    return vectors
+def artist_similarity(artist_id_1, artist_id_2):
+    """Return similarity between two artists."""
 
+    vector_1 = get_artist_vector(artist_id_1)
+    vector_2 = get_artist_vector(artist_id_2)
+
+    return float(
+        score(
+            vector_1,
+            vector_2
+        )
+    )
 
 # =========================
 # 3. Build the graph
@@ -163,8 +263,8 @@ def build_similarity_graph(vectors):
     for artist_id in artist_ids:
         graph.add_node(artist_id)
 
-    # Calculate cosine similarities for all pairs at once.
-    similarities = -np.log10(1-cosine_similarity(vectors.to_numpy()))
+    # Calculate similarities for all pairs at once.
+    similarities = score(vectors.to_numpy())
 
     # Add an undirected weighted edge between every pair.
     for i, j in combinations(range(len(artist_ids)), 2):
@@ -216,3 +316,4 @@ def main(genre):
 
 if __name__ == "__main__":
     main(GENRE)
+
