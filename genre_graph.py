@@ -28,7 +28,8 @@ import numpy as np
 
 DATA_FOLDER = "data/"
 INFLUENCE_FILE = DATA_FOLDER + "influence_data.csv"
-ARTIST_FILE = DATA_FOLDER + "artist_vectors.csv"
+ARTIST_FILE = DATA_FOLDER + "data_by_artist.csv"
+FEATURE_FILE = DATA_FOLDER + "artist_vectors.csv"
 
 GENRE = "Jazz"
 SIMILARITY_THRESHOLD = 8
@@ -156,7 +157,7 @@ def get_all_ids(artist_file):
 
 #     return vectors
 
-def get_artist_vectors(artist_file, artist_ids, features):
+def get_artist_vectors(artist_file, artist_ids, features, standardize=False):
     df = pd.read_csv(artist_file, dtype={"artist_id": str})
 
     df["artist_id"] = df["artist_id"].str.strip()
@@ -180,15 +181,18 @@ def get_artist_vectors(artist_file, artist_ids, features):
     # Remove artists with no usable feature values
     vectors = vectors.dropna(axis=0, how="any")
 
+    if standardize:
     # Standardize features across artists (mean=0, std=1)
-    scaler = StandardScaler()
-    standardized = scaler.fit_transform(vectors)
+        scaler = StandardScaler()
+        standardized = scaler.fit_transform(vectors)
 
-    return pd.DataFrame(
-        standardized,
-        index=vectors.index,
-        columns=vectors.columns
-    )
+        return pd.DataFrame(
+            standardized,
+            index=vectors.index,
+            columns=vectors.columns
+        )
+
+    return vectors
 
 def get_artist_vector(artist_id):
     """Return the feature vector for a given artist_id."""
