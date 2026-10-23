@@ -32,7 +32,7 @@ ARTIST_FILE = DATA_FOLDER + "data_by_artist.csv"
 FEATURE_FILE = DATA_FOLDER + "artist_vectors.csv"
 
 GENRE = "Jazz"
-SIMILARITY_THRESHOLD = 3
+SIMILARITY_THRESHOLD = 8.5
 
 # Choose the columns from data_by_artist.csv that form each vector.
 # Replace these examples with columns that actually exist in your file.
@@ -242,12 +242,17 @@ def score(v1, v2, method="euclidean", sigma=1.0):
     if not np.all(np.isfinite(v1)) or not np.all(np.isfinite(v2)):
         raise ValueError("Vectors must contain only finite values.")
 
-    distance = np.linalg.norm(v1 - v2)
 
     if method == "euclidean":
-        return float(10/(1+distance))
+        distance = np.linalg.norm(v1 - v2)
+        return float(100/(10+distance))
+
+    if method == "minkowski":
+        distance = np.linalg.norm(v1 - v2, 1)
+        return float(100/(10 + distance))
 
     elif method == "gaussian":
+        distance = np.linalg.norm(v1 - v2)
         if sigma <= 0:
             raise ValueError("sigma must be positive.")
         return float(np.exp(-(distance ** 2) / (2 * sigma ** 2)))
