@@ -17,7 +17,6 @@ with a weight of at least SIMILARITY_THRESHOLD which ranges higher in 0 to 1.
 
 import pandas as pd
 import networkx as nx
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import StandardScaler
 from itertools import combinations
 import numpy as np

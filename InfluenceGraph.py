@@ -3,13 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 import textwrap
+from genre_graph import score, get_artist_vector
 
 
-selected_genre = "Reggae" #Select None to make full graph
+selected_genre = "Jazz" #Select None to make full graph
 
 influence_graph = nx.DiGraph()
 
-with open("2021_ICM_Problem_D_Data/influence_data.csv", newline="", encoding="utf-8-sig") as file:
+with open("data/influence_data.csv", newline="", encoding="utf-8-sig") as file:
     reader = csv.DictReader(file)
 
     for row in reader:
@@ -37,7 +38,11 @@ with open("2021_ICM_Problem_D_Data/influence_data.csv", newline="", encoding="ut
                                      active_start=int(row["follower_active_start"])
                                      )
 
-            influence_graph.add_edge(influencer_id,follower_id)
+
+            influencer_v = get_artist_vector(influencer_id)
+            follower_v = get_artist_vector(follower_id)
+            val = score(influencer_v, follower_v)
+            influence_graph.add_edge(influencer_id,follower_id, weight=val)
 
 
 graph_name = selected_genre if selected_genre is not None else "All genres"
