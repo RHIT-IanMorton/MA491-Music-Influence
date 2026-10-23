@@ -32,7 +32,7 @@ ARTIST_FILE = DATA_FOLDER + "data_by_artist.csv"
 FEATURE_FILE = DATA_FOLDER + "artist_vectors.csv"
 
 GENRE = "Jazz"
-SIMILARITY_THRESHOLD = 8
+SIMILARITY_THRESHOLD = 3
 
 # Choose the columns from data_by_artist.csv that form each vector.
 # Replace these examples with columns that actually exist in your file.
@@ -53,6 +53,22 @@ FEATURE_COLUMNS = [
 
 OUTPUT_GRAPH = DATA_FOLDER + "artist_similarity.graphml"
 OUTPUT_FEATURES = DATA_FOLDER + "graph_vectors.csv"
+
+def make_feature_file():
+    artist_ids = get_all_ids(ARTIST_FILE)
+    print(f"Found {len(artist_ids)} unique IDs.")
+
+    vectors = get_artist_vectors(
+        artist_ids,
+        ARTIST_FILE,
+        FEATURE_COLUMNS,
+        standardize=True
+    )
+
+    print(f"Features used: {list(vectors.columns)}")
+
+    # Save the vectors used to build the graph.
+    vectors.to_csv(FEATURE_FILE)
 
 
 # =========================
@@ -157,7 +173,7 @@ def get_all_ids(artist_file):
 
 #     return vectors
 
-def get_artist_vectors(artist_file, artist_ids, features, standardize=False):
+def get_artist_vectors(artist_ids, artist_file=FEATURE_FILE, features=FEATURE_COLUMNS, standardize=False):
     df = pd.read_csv(artist_file, dtype={"artist_id": str})
 
     df["artist_id"] = df["artist_id"].str.strip()
@@ -194,11 +210,11 @@ def get_artist_vectors(artist_file, artist_ids, features, standardize=False):
 
     return vectors
 
-def get_artist_vector(artist_id):
+def get_artist_vector(artist_id, artist_file=FEATURE_FILE, features=FEATURE_COLUMNS):
     """Return the feature vector for a given artist_id."""
 
     artist_id = str(artist_id)
-    df = pd.read_csv(ARTIST_FILE, dtype={"artist_id": str})
+    df = pd.read_csv(artist_file, dtype={"artist_id": str})
 
     # Find the artist's row
     artist = df.loc[df["artist_id"] == str(artist_id)]
@@ -210,12 +226,12 @@ def get_artist_vector(artist_id):
         raise ValueError(f"Multiple rows found for artist ID {artist_id}.")
 
     # Extract the selected fields as a numeric vector
-    vector = artist.iloc[0][FEATURE_COLUMNS]
+    vector = artist.iloc[0][features]
     vector = pd.to_numeric(vector, errors="raise")
 
     return vector.to_numpy(dtype=float)
 
-def score(v1, v2, method="gaussian", sigma=1.0):
+def score(v1, v2, method="euclidean", sigma=1.0):
     v1 = np.asarray(v1, dtype=float).ravel()
     v2 = np.asarray(v2, dtype=float).ravel()
 
@@ -229,7 +245,7 @@ def score(v1, v2, method="gaussian", sigma=1.0):
     distance = np.linalg.norm(v1 - v2)
 
     if method == "euclidean":
-        return float(distance)
+        return float(10/(1+distance))
 
     elif method == "gaussian":
         if sigma <= 0:
@@ -262,21 +278,21 @@ def build_similarity_graph(vectors):
     graph = nx.Graph()
 
     artist_ids = vectors.index.tolist()
+    vectors = vectors.to_numpy()
 
     # Add one node for each artist.
     for artist_id in artist_ids:
         graph.add_node(artist_id)
 
-    # Calculate similarities for all pairs at once.
-    similarities = score(vectors.to_numpy())
 
     # Add an undirected weighted edge between every pair.
     for i, j in combinations(range(len(artist_ids)), 2):
-        if (similarities[i,j] >= SIMILARITY_THRESHOLD):     # drop edges too small
+        similarity = score(vectors[i], vectors[j])
+        if (similarity >= SIMILARITY_THRESHOLD):     # drop edges too small
             graph.add_edge(
                 artist_ids[i],
                 artist_ids[j],
-                weight=float(similarities[i, j])
+                weight=float(similarity)
             )
 
     return graph
@@ -287,12 +303,13 @@ def build_similarity_graph(vectors):
 # =========================
 
 def main(genre):
+    make_feature_file()
     artist_ids = get_genre_ids(INFLUENCE_FILE, genre)
     print(f"Found {len(artist_ids)} unique {genre} IDs.")
 
     vectors = get_artist_vectors(
-        ARTIST_FILE,
         artist_ids,
+        FEATURE_FILE,
         FEATURE_COLUMNS
     )
 
