@@ -473,7 +473,7 @@ def main_full():
     # ========== RELABELLING ================
 
     # Save the graph in GraphML format.
-    # nx.write_graphml(graph, f"{DATA_FOLDER}full_graph.graphml")
+    nx.write_graphml(graph, f"{DATA_FOLDER}full_graph.graphml")
     # draw_graph(graph, f"{DATA_FOLDER}{genre}_graph.svg")
 
 

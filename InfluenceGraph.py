@@ -147,14 +147,14 @@ for iteration in range(100):
                 pos[artist_a] -= movement * direction
                 pos[artist_b] += movement * direction
 
-plt.figure(figsize=(16, 12))
+fig, ax = plt.subplots(figsize=(16, 12))
 
 nx.draw_networkx_nodes(
     display_graph,
     pos,
     node_size=node_sizes,
     node_color="steelblue",
-    edgecolors="white"
+    edgecolors="white", ax=ax
 )
 
 nx.draw_networkx_edges(
@@ -166,7 +166,7 @@ nx.draw_networkx_edges(
     arrowsize=14,
     width=0.8,
     alpha=0.4,
-    connectionstyle="arc3,rad=0.08"
+    connectionstyle="arc3,rad=0.08", ax=ax
 )
 
 # Split long artist names across lines.
@@ -186,7 +186,7 @@ nx.draw_networkx_labels(
     label_positions,
     labels=wrapped_labels,
     font_size=8,
-    verticalalignment="center",
+    verticalalignment="center", ax=ax,
     bbox=dict(
         facecolor="white",
         edgecolor="none",
@@ -195,14 +195,33 @@ nx.draw_networkx_labels(
     )
 )
 
+edge_labels = {
+    (u, v): f"{data['weight']:.2f}"
+    for u, v, data in display_graph.edges(data=True)
+    # if data["weight"] >= 9.5
+}
+
+nx.draw_networkx_edge_labels(
+    display_graph,
+    pos,
+    edge_labels=edge_labels,
+    font_size=6,
+    font_color="darkred",
+    rotate=False, ax=ax,
+    bbox={"alpha": 0.7, "color": "white", "pad": 0.5}
+)
+
 plt.title(
     f"Musical Influence: {graph_name}\n"
     f"Connections among the top {display_graph.number_of_nodes()} "
     f"{graph_name} artists by out-degree"
 )
 
-plt.axis("off")
-plt.gca().set_aspect("equal")
-plt.tight_layout()
+ax.set_axis_off()
+fig.tight_layout(pad=0.1)
+
+ax.set_axis_off()
+fig.gca().set_aspect("equal")
+fig.savefig("data/Jazz_influence.svg",  bbox_inches="tight")
 plt.show()
 
