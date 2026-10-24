@@ -13,8 +13,8 @@ with a weight of at least SIMILARITY_THRESHOLD which ranges higher in 0 to 1.
 """
 
 
-
-
+from sys import argv
+from pathlib import Path
 import pandas as pd
 import networkx as nx
 from sklearn.preprocessing import StandardScaler
@@ -244,7 +244,7 @@ def build_similarity_graph(vectors):
 
     return graph
 
-def draw_graph(graph, file, show=False):
+def draw_graph(graph: nx.Graph, file, show=False):
     """
     Draws the graph with matplotlib to be outputed to file named with genre
 
@@ -280,9 +280,9 @@ def draw_graph(graph, file, show=False):
     nx.draw_networkx_nodes(
         graph, pos, ax=ax,
         node_size=[
-            12 + 8 * graph.degree(n) for n in graph.nodes()
+            3 + 2 * graph.degree(n) for n in graph.nodes()
         ],
-        node_color="#3977a8",
+        node_color="#01B8E6",
         alpha=0.85,
         linewidths=0
     )
@@ -300,21 +300,22 @@ def draw_graph(graph, file, show=False):
         ax=ax
     )
 
-    edge_labels = {
-        (u, v): f"{data['weight']:.2f}"
-        for u, v, data in graph.edges(data=True)
-        if data["weight"] >= 9.5
-    }
+    if not graph.number_of_edges() > 1000:
+        edge_labels = {
+            (u, v): f"{data['weight']:.2f}"
+            for u, v, data in graph.edges(data=True)
+            if data["weight"] >= 9.5
+        }
 
-    nx.draw_networkx_edge_labels(
-        graph,
-        pos,
-        edge_labels=edge_labels,
-        font_size=6,
-        font_color="darkred",
-        rotate=False,
-        bbox={"alpha": 0.7, "color": "white", "pad": 0.5}
-    )
+        nx.draw_networkx_edge_labels(
+            graph,
+            pos,
+            edge_labels=edge_labels,
+            font_size=6,
+            font_color="darkred",
+            rotate=False,
+            bbox={"alpha": 0.7, "color": "white", "pad": 0.5}
+        )
 
     ax.set_axis_off()
     fig.tight_layout(pad=0.1)
@@ -332,8 +333,9 @@ def draw_graph(graph, file, show=False):
 # 4. Run everything
 # =========================
 
-def main(genre):
-    make_feature_file()
+def main(genre: str):
+    if not Path(INFLUENCE_FILE).exists():
+        make_feature_file()
     artist_ids = get_genre_ids(INFLUENCE_FILE, genre)
     print(f"Found {len(artist_ids)} unique {genre} IDs.")
 
@@ -369,6 +371,7 @@ def main(genre):
     # ========== RELABELLING ================
 
     # Save the graph in GraphML format.
+    genre = genre.replace("/", "")
     nx.write_graphml(graph, f"{DATA_FOLDER}{genre}_graph.graphml")
     # draw_graph(graph, f"{DATA_FOLDER}{genre}_graph.svg")
 
@@ -384,13 +387,13 @@ def main(genre):
         print(f"{u} -- {v}: {data['weight']:.4f}")
 
     forrest = nx.maximum_spanning_tree(graph, weight="weight")
+    nx.write_graphml(forrest, f"{DATA_FOLDER}{genre}_forrest.graphml")
     forrest = forrest.subgraph(
         node for component in nx.connected_components(forrest)
         if len(component) > 3
         for node in component
     ).copy()
     draw_graph(forrest, f"{DATA_FOLDER}{genre}_forrest.svg")
-    nx.write_graphml(forrest, f"{DATA_FOLDER}{genre}_forrest.graphml")
 
 
     print("\n")
@@ -432,7 +435,82 @@ def main(genre):
     # Force-directed layout handles physics calculations efficiently
     net.show(f"{DATA_FOLDER}{genre}_forrest.html")
 
+def main_full():
+    if not Path(FEATURE_FILE).exists():
+            make_feature_file()
+    artist_ids = get_all_ids(FEATURE_FILE)
+    print(f"Found {len(artist_ids)} unique IDs.")
+
+    vectors = get_artist_vectors(
+        artist_ids,
+        FEATURE_FILE,
+        FEATURE_COLUMNS
+    )
+
+    print(f"Matched {len(vectors)} artists in {ARTIST_FILE}.")
+    print(f"Features used: {list(vectors.columns)}")
+
+    # Save the vectors used to build the graph.
+    vectors.to_csv(OUTPUT_FEATURES)
+
+    graph = build_similarity_graph(vectors)
+
+    # ========== RELABELLING ================
+
+    # Load artist names
+    artist_names = (
+        pd.read_csv(ARTIST_FILE, dtype={"artist_id": str})
+        .set_index("artist_id")["artist_name"]
+        .to_dict()
+    )
+
+    # Relabel graph nodes (assuming node IDs are artist IDs)
+    graph = nx.relabel_nodes(
+        graph,
+        {node: artist_names.get(str(node), str(node)) for node in graph.nodes()}
+    )
+
+    # ========== RELABELLING ================
+
+    # Save the graph in GraphML format.
+    # nx.write_graphml(graph, f"{DATA_FOLDER}full_graph.graphml")
+    # draw_graph(graph, f"{DATA_FOLDER}{genre}_graph.svg")
+
+
+    print(f"Graph nodes: {graph.number_of_nodes()}")
+    print(f"Graph edges: {graph.number_of_edges()}")
+    # print(f"Saved graph to {DATA_FOLDER}full_graph.graphml")
+    print(f"Saved vectors to {OUTPUT_FEATURES}")
+
+    # Display a few example edges.
+    print("\nExample artist similarities:")
+    for u, v, data in list(graph.edges(data=True))[:10]:
+        print(f"{u} -- {v}: {data['weight']:.4f}")
+
+    forrest = nx.maximum_spanning_tree(graph, weight="weight")
+    nx.write_graphml(forrest, f"{DATA_FOLDER}full_forrest.graphml")
+    forrest = forrest.subgraph(
+        node for component in nx.connected_components(forrest)
+        if len(component) > 5
+        for node in component
+    ).copy()
+    draw_graph(forrest, f"{DATA_FOLDER}full_forrest.svg")
+
+
+    print("\n")
+    print("Original nodes:", graph.number_of_nodes())
+    print("Original edges:", graph.number_of_edges())
+    print("Forest nodes:", forrest.number_of_nodes())
+    print("Forest edges:", forrest.number_of_edges())
+    print("Connected components:", nx.number_connected_components(forrest))
+    print(f"Saved forrest to {DATA_FOLDER}full_forrest.graphml")
 
 if __name__ == "__main__":
-    main(GENRE)
+    if len(argv) < 2:
+        raise BufferError("Please specify either 'full', or a genre from influence_data.csv")
+
+    if argv[1] == "full":
+        main_full()
+    else:
+        main(str(argv[1]))
 

@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import csv
 import textwrap
-from genre_graph import score, get_artist_vector
+from SimilarityGraph import score, get_artist_vector
 
 
 selected_genre = "Jazz" #Select None to make full graph
