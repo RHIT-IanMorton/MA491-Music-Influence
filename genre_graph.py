@@ -244,7 +244,7 @@ def build_similarity_graph(vectors):
 
     return graph
 
-def draw_graph(graph, file):
+def draw_graph(graph, file, show=False):
     """
     Draws the graph with matplotlib to be outputed to file named with genre
 
@@ -252,12 +252,10 @@ def draw_graph(graph, file):
     """
 
     # Consistent layout; stronger weights attract nodes more strongly
-    pos = nx.spring_layout(
+    pos = nx.nx_agraph.graphviz_layout(
         graph,
-        weight="weight",
-        seed=42,
-        iterations=200,
-        k=1.2 / np.sqrt(max(graph.number_of_nodes(), 1))
+        prog="sfdp",
+        args="-Gpack=true -Gpackmode=cluster -GK=0.8 -Gsep=-5"
     )
 
     fig, ax = plt.subplots(figsize=(10, 8))
@@ -302,6 +300,22 @@ def draw_graph(graph, file):
         ax=ax
     )
 
+    edge_labels = {
+        (u, v): f"{data['weight']:.2f}"
+        for u, v, data in graph.edges(data=True)
+        if data["weight"] >= 9.5
+    }
+
+    nx.draw_networkx_edge_labels(
+        graph,
+        pos,
+        edge_labels=edge_labels,
+        font_size=6,
+        font_color="darkred",
+        rotate=False,
+        bbox={"alpha": 0.7, "color": "white", "pad": 0.5}
+    )
+
     ax.set_axis_off()
     fig.tight_layout(pad=0.1)
 
@@ -309,7 +323,8 @@ def draw_graph(graph, file):
     # fig.savefig("artist_network.png", dpi=300, bbox_inches="tight")
     fig.savefig(file, bbox_inches="tight")
 
-    plt.show()
+    if show:
+        plt.show()
 
 
 
@@ -355,7 +370,7 @@ def main(genre):
 
     # Save the graph in GraphML format.
     nx.write_graphml(graph, f"{DATA_FOLDER}{genre}_graph.graphml")
-    draw_graph(graph, f"{DATA_FOLDER}{genre}_graph.svg")
+    # draw_graph(graph, f"{DATA_FOLDER}{genre}_graph.svg")
 
 
     print(f"Graph nodes: {graph.number_of_nodes()}")
@@ -369,8 +384,13 @@ def main(genre):
         print(f"{u} -- {v}: {data['weight']:.4f}")
 
     forrest = nx.maximum_spanning_tree(graph, weight="weight")
-    nx.write_graphml(forrest, f"{DATA_FOLDER}{genre}_forrest.graphml")
+    forrest = forrest.subgraph(
+        node for component in nx.connected_components(forrest)
+        if len(component) > 3
+        for node in component
+    ).copy()
     draw_graph(forrest, f"{DATA_FOLDER}{genre}_forrest.svg")
+    nx.write_graphml(forrest, f"{DATA_FOLDER}{genre}_forrest.graphml")
 
 
     print("\n")
