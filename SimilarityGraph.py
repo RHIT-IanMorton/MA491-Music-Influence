@@ -33,7 +33,7 @@ ARTIST_FILE = DATA_FOLDER + "data_by_artist.csv"
 FEATURE_FILE = DATA_FOLDER + "artist_vectors.csv"
 
 GENRE = "Jazz"
-SIMILARITY_THRESHOLD = 8.5
+SIMILARITY_THRESHOLD = 9
 
 # Choose the columns from data_by_artist.csv that form each vector.
 # Replace these examples with columns that actually exist in your file.
@@ -50,6 +50,7 @@ FEATURE_COLUMNS = [
     "liveness",
     "speechiness",
     "duration_ms",
+    # "popularity"
     ]
 
 OUTPUT_FEATURES = DATA_FOLDER + "graph_vectors.csv"
@@ -107,8 +108,8 @@ def get_all_ids(artist_file):
 # 2. Build artist vectors
 # =========================
 
-def get_artist_vectors(artist_ids, artist_file=FEATURE_FILE, features=FEATURE_COLUMNS, standardize=False):
-    df = pd.read_csv(artist_file, dtype={"artist_id": str})
+def get_artist_vectors(artist_ids, feature_file=FEATURE_FILE, features=FEATURE_COLUMNS, standardize=False) -> np.ndarray:
+    df = pd.read_csv(feature_file, dtype={"artist_id": str})
 
     df["artist_id"] = df["artist_id"].str.strip()
     artist_ids = {str(i).strip() for i in artist_ids}
@@ -144,11 +145,11 @@ def get_artist_vectors(artist_ids, artist_file=FEATURE_FILE, features=FEATURE_CO
 
     return vectors
 
-def get_artist_vector(artist_id, artist_file=FEATURE_FILE, features=FEATURE_COLUMNS):
+def get_artist_vector(artist_id, feature_file=FEATURE_FILE, features=FEATURE_COLUMNS) -> np.ndarray:
     """Return the feature vector for a given artist_id."""
 
     artist_id = str(artist_id)
-    df = pd.read_csv(artist_file, dtype={"artist_id": str})
+    df = pd.read_csv(feature_file, dtype={"artist_id": str})
 
     # Find the artist's row
     artist = df.loc[df["artist_id"] == str(artist_id)]
@@ -169,7 +170,7 @@ def get_artist_vector(artist_id, artist_file=FEATURE_FILE, features=FEATURE_COLU
 #    SCORING
 # ==============
 
-def score(v1, v2, method="euclidean", sigma=1.0):
+def score(v1, v2, method="cosine", sigma=1.0):
     v1 = np.asarray(v1, dtype=float).ravel()
     v2 = np.asarray(v2, dtype=float).ravel()
 
@@ -180,6 +181,8 @@ def score(v1, v2, method="euclidean", sigma=1.0):
     if not np.all(np.isfinite(v1)) or not np.all(np.isfinite(v2)):
         raise ValueError("Vectors must contain only finite values.")
 
+    if method == "cosine":
+        return 10 * np.dot(v1,v2) / (np.linalg.norm(v1) * np.linalg.norm(v2))
 
     if method == "euclidean":
         distance = np.linalg.norm(v1 - v2)
@@ -327,14 +330,66 @@ def draw_graph(graph: nx.Graph, file, show=False):
     if show:
         plt.show()
 
+def check_max_weight_influence(G, influence_file=INFLUENCE_FILE):
+    influence_df = pd.read_csv(influence_file)
 
+    # Store each influence pair for fast lookup, ignoring direction
+    influence_pairs = {
+        frozenset((row["influencer_name"], row["follower_name"]))
+        for _, row in influence_df.iterrows()
+    }
+
+    results = []
+
+    for node in G.nodes():
+        edges = G.edges(node, data=True)
+
+        if not edges:
+            continue
+
+        # Find this node's highest-weight edge
+        u, v, data = max(edges, key=lambda edge: edge[2].get("weight", float("-inf")))
+
+        pair = frozenset((u, v))
+        results.append({
+            "node": node,
+            "other_node": v if u == node else u,
+            "weight": data.get("weight"),
+            "artist_pair": (u, v),
+            "influence_exists": pair in influence_pairs,
+        })
+
+    return pd.DataFrame(results)
+
+def check_all_edges_influence(G, influence_file=INFLUENCE_FILE):
+    influence_df = pd.read_csv(influence_file)
+
+    # Build a set of artist pairs, ignoring direction
+    influence_pairs = {
+        frozenset((row["influencer_name"], row["follower_name"]))
+        for _, row in influence_df.iterrows()
+    }
+
+    results = []
+
+    for u, v, data in G.edges(data=True):
+        pair = frozenset((u, v))
+
+        results.append({
+            "artist_1": u,
+            "artist_2": v,
+            "weight": data.get("weight"),
+            "influence_exists": pair in influence_pairs,
+        })
+
+    return pd.DataFrame(results)
 
 # =========================
 # 4. Run everything
 # =========================
 
 def main(genre: str):
-    if not Path(INFLUENCE_FILE).exists():
+    if not Path(FEATURE_FILE).exists():
         make_feature_file()
     artist_ids = get_genre_ids(INFLUENCE_FILE, genre)
     print(f"Found {len(artist_ids)} unique {genre} IDs.")
@@ -390,7 +445,7 @@ def main(genre: str):
     nx.write_graphml(forrest, f"{DATA_FOLDER}{genre}_forrest.graphml")
     forrest = forrest.subgraph(
         node for component in nx.connected_components(forrest)
-        if len(component) > 3
+        if len(component) > 5
         for node in component
     ).copy()
     draw_graph(forrest, f"{DATA_FOLDER}{genre}_forrest.svg")
@@ -438,7 +493,7 @@ def main(genre: str):
 def main_full():
     if not Path(FEATURE_FILE).exists():
             make_feature_file()
-    artist_ids = get_all_ids(FEATURE_FILE)
+    artist_ids = get_all_ids(ARTIST_FILE)
     print(f"Found {len(artist_ids)} unique IDs.")
 
     vectors = get_artist_vectors(
