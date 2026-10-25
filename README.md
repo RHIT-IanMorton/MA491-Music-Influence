@@ -12,9 +12,11 @@ If you wish to run Jupyter Notebooks like `scoring.ipynb`, instead run
 `pip install -r ipynb_requirements.txt`
 
 ## Running
-Simply run the command `python SimilarityGraph.py <genre>` with your choice of genre.
+Simply run the command `python SimilarityGraph.py <genre> [threshold]` with your choice of genre.
 If no genre is specified, the default is "Jazz". You can also pass in `full` in place of genre
-to use all available data to make a complete tree.
+to use all available data to make a complete tree. `threshold` is an optional value which determines
+the threshold of similarity between two artists that must be met for the edge to stay in the graph,
+the default value is 9.
 
 WARNING - running with `full` will take a while to finish.
 

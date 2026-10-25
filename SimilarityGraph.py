@@ -220,7 +220,7 @@ def artist_similarity(artist_id_1, artist_id_2):
 # 3. Build the graph
 # =========================
 
-def build_similarity_graph(vectors):
+def build_similarity_graph(vectors, threshold=SIMILARITY_THRESHOLD):
     graph = nx.Graph()
 
     artist_ids = vectors.index.tolist()
@@ -234,7 +234,7 @@ def build_similarity_graph(vectors):
     # Add an undirected weighted edge between every pair.
     for i, j in combinations(range(len(artist_ids)), 2):
         similarity = score(vectors[i], vectors[j])
-        if (similarity >= SIMILARITY_THRESHOLD):     # drop edges too small
+        if (similarity >= threshold):     # drop edges too small
             graph.add_edge(
                 artist_ids[i],
                 artist_ids[j],
@@ -388,7 +388,7 @@ def check_all_edges_influence(G, influence_file=INFLUENCE_FILE):
 # 4. Run everything
 # =========================
 
-def main(genre: str):
+def main(genre: str, threshold=SIMILARITY_THRESHOLD):
     if not Path(FEATURE_FILE).exists():
         make_feature_file()
     artist_ids = get_genre_ids(INFLUENCE_FILE, genre)
@@ -406,7 +406,7 @@ def main(genre: str):
     # Save the vectors used to build the graph.
     vectors.to_csv(OUTPUT_FEATURES)
 
-    graph = build_similarity_graph(vectors)
+    graph = build_similarity_graph(vectors, threshold)
 
     # ========== RELABELLING ================
 
@@ -490,7 +490,7 @@ def main(genre: str):
     # Force-directed layout handles physics calculations efficiently
     net.show(f"{DATA_FOLDER}{genre}_forrest.html")
 
-def main_full():
+def main_full(threshold=SIMILARITY_THRESHOLD):
     if not Path(FEATURE_FILE).exists():
             make_feature_file()
     artist_ids = get_all_ids(ARTIST_FILE)
@@ -508,7 +508,7 @@ def main_full():
     # Save the vectors used to build the graph.
     vectors.to_csv(OUTPUT_FEATURES)
 
-    graph = build_similarity_graph(vectors)
+    graph = build_similarity_graph(vectors, threshold)
 
     # ========== RELABELLING ================
 
@@ -562,10 +562,17 @@ def main_full():
 
 if __name__ == "__main__":
     if len(argv) < 2:
-        raise BufferError("Please specify either 'full', or a genre from influence_data.csv")
+        raise BufferError("Please specify either 'full', or a genre from influence_data.csv. Optionally specify threshold after.")
 
     if argv[1] == "full":
-        main_full()
+        if len(argv) >= 3:
+            main_full(argv[2])
+        else:
+            main_full()
     else:
-        main(str(argv[1]))
+        if len(argv) >= 3:
+            main(str(argv[1]), argv[2])
+        else:
+            main(str(argv[1]))
+            
 

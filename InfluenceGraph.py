@@ -222,6 +222,6 @@ fig.tight_layout(pad=0.1)
 
 ax.set_axis_off()
 fig.gca().set_aspect("equal")
-fig.savefig("data/Jazz_influence.svg",  bbox_inches="tight")
+fig.savefig(f"data/{selected_genre}_influence.svg",  bbox_inches="tight")
 plt.show()
 
