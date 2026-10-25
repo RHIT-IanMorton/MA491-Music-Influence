@@ -1,9 +1,9 @@
 # MA491 Music Influences 2021 COMAP problem D
 
+![Full tree](data/full_forrest.svg)
+
 ## Setup
-1. Create a data folder in this main directory, insert each problem data `.csv` file,
-specify the name of this file in `SimilarityGraph.py` under the variable `DATA_FOLDER` near the top
-or just name your data folder "data".
+1. Insert each problem data `.csv` file into the `data/` folder.
 
 2. With your appropriate python environment (including `pip`), install package dependencies with
 `pip install -r requirements.txt`.

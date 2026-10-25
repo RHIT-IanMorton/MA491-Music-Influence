@@ -1,10 +1,6 @@
-*
+__pycache__
+.*/
+*.csv
+*.graphml
 
-!*/
-!.gitignore
-!*.md
-!*.py
-!*.ipynb
-!*.dat
-
-!requirements.txt
+requirements.txt
